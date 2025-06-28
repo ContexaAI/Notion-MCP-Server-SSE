@@ -33,8 +33,11 @@ export async function startServer(args: string[] = process.argv.slice(2)) {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
+    const serverId = req.params.serverId
+    console.log("serverId", serverId)
+
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    res.setHeader('Access-Control-Allow-Headers', '*');
 
     const transport = new SSEServerTransport('/api/messages', res);
     const sessionId = transport.sessionId;
