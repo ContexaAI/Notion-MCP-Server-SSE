@@ -16,7 +16,7 @@ RUN npm ci --ignore-scripts --omit=dev
 COPY . .
 
 # Build the package
-RUN --mount=type=cache,target=/root/.npm npm run build
+RUN npm run build
 
 # Install package globally
 RUN npm link
