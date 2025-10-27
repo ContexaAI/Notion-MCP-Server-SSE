@@ -171,7 +171,3 @@ export class MCPProxy {
   }
 }
 
-/**
- * Tool name:
- * 
- * */
