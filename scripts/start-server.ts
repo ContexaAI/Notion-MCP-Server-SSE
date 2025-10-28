@@ -8,7 +8,7 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js'
 import { randomUUID } from 'node:crypto'
 import { initProxy, ValidationError } from '../src/init-server'
 
-const SERVER_NAME = 'Notion API'
+const SERVER_NAME = 'Notion MCP Server'
 const SERVER_VERSION = '1.0.0'
 
 export async function startServer(args: string[] = process.argv.slice(2)) {
