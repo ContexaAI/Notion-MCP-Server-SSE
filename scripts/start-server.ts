@@ -1,9 +1,11 @@
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js'
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import cors from 'cors'
 import express from 'express'
 import path from 'node:path'
 import { fileURLToPath } from 'url'
 
+import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js'
+import { randomUUID } from 'node:crypto'
 import { initProxy, ValidationError } from '../src/init-server'
 
 const SERVER_NAME = 'Notion API'
@@ -19,7 +21,7 @@ export async function startServer(args: string[] = process.argv.slice(2)) {
   app.get('/', (_: any, res: any) => {
     res.json({ status: 'OK', server: SERVER_NAME, version: SERVER_VERSION });
   });
-  const transports: { [key: string]: SSEServerTransport } = {};
+  const transports: { [key: string]: StreamableHTTPServerTransport } = {};
 
   const filename = fileURLToPath(import.meta.url)
   const directory = path.dirname(filename)
@@ -28,58 +30,59 @@ export async function startServer(args: string[] = process.argv.slice(2)) {
   const baseUrl = process.env.BASE_URL ?? undefined
   const proxy = await initProxy(specPath, baseUrl)
 
-  app.get("/sse", async (req: any, res: any) => {
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
 
-    const serverId = req.params.serverId
-    console.log("serverId", serverId)
+  app.use(express.json());
 
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Headers', '*');
 
-    const transport = new SSEServerTransport('/api/messages', res);
-    const sessionId = transport.sessionId;
-    console.error(`New SSE connection established: ${sessionId}`);
-    transports[sessionId] = transport;
+  app.post('/mcp', async (req, res) => {
+    const sessionId = req.headers['mcp-session-id'] as string | undefined;
+    let transport: StreamableHTTPServerTransport;
 
-    req.on('close', () => {
-      console.error(`SSE connection closed: ${sessionId}`);
-      delete transports[sessionId];
-    });
+    if (sessionId && transports[sessionId]) {
+      transport = transports[sessionId];
+    } else if (!sessionId && isInitializeRequest(req.body)) {
+      transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => randomUUID(),
+        onsessioninitialized: sessionId => {
+          transports[sessionId] = transport;
+        }
+      });
 
-    await proxy.connect(transport)
+      // Clean up transport when closed
+      transport.onclose = () => {
+        if (transport.sessionId) {
+          delete transports[transport.sessionId];
+        }
+      };
+
+      await proxy.getServer().connect(transport);
+    } else {
+      return;
+    }
+
+    await transport.handleRequest(req, res, req.body);
   });
 
-  app.post("/api/messages", async (req: any, res: any) => {
-    const sessionId = req.query.sessionId;
-    if (!sessionId) {
-      return res.status(400).send('Missing sessionId query parameter');
+  const handleSessionRequest = async (req: express.Request, res: express.Response) => {
+    const sessionId = req.headers['mcp-session-id'] as string | undefined;
+    if (!sessionId || !transports[sessionId]) {
+      res.status(400).send('Invalid or missing session ID');
+      return;
     }
+
     const transport = transports[sessionId];
-    if (!transport) {
-      return res.status(404).send('No active session found with the provided sessionId');
-    }
-    try {
-      await transport.handlePostMessage(req, res);
-    }
-    catch (error) {
-      console.error(`Error handling message for session ${sessionId}:`, error);
-      // If the response hasn't been sent yet, send an error response
-      if (!res.headersSent) {
-        res.status(500).send('Internal server error processing message');
-      }
-    }
-  });
+    await transport.handleRequest(req, res);
+  };
+
+  app.get('/mcp', handleSessionRequest);
+  app.delete('/mcp', handleSessionRequest);
 
   const PORT = 8080
 
   app.listen(PORT, () => {
     console.error(`MCP Web Server running at http://localhost:${PORT}`);
-    console.error(`- SSE Endpoint: http://localhost:${PORT}/sse`);
-    console.error(`- Messages Endpoint: http://localhost:${PORT}/api/messages?sessionId=YOUR_SESSION_ID`);
     console.error(`- Health Check: http://localhost:${PORT}/health`);
+    console.error(`- MCP Endpoint: http://localhost:${PORT}/mcp`);
   });
 
   return proxy.getServer()
