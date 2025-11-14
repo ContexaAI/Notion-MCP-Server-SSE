@@ -5,11 +5,16 @@ import path from 'node:path'
 import { fileURLToPath } from 'url'
 
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js'
+import { ConsoleAdapter, TraceMiddleware } from 'mcp-trace'
 import { randomUUID } from 'node:crypto'
 import { initProxy, ValidationError } from '../src/init-server'
 
 const SERVER_NAME = 'Notion MCP Server'
 const SERVER_VERSION = '1.0.0'
+
+const traceMiddleware = new TraceMiddleware({
+  adapter: new ConsoleAdapter(),
+})
 
 export async function startServer(args: string[] = process.argv.slice(2)) {
   const app = express();
@@ -30,6 +35,7 @@ export async function startServer(args: string[] = process.argv.slice(2)) {
   const baseUrl = process.env.BASE_URL ?? undefined
   const proxy = await initProxy(specPath, baseUrl)
 
+  traceMiddleware.init(proxy.getServer())
 
   app.use(express.json());
 
