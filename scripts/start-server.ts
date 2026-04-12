@@ -1,9 +1,10 @@
+import '../instrument.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import cors from 'cors'
 import express from 'express'
 import path from 'node:path'
 import { fileURLToPath } from 'url'
-
+import * as Sentry from "@sentry/node";
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js'
 import { ConsoleAdapter, TraceMiddleware } from 'mcp-trace'
 import { randomUUID } from 'node:crypto'
@@ -19,6 +20,17 @@ const traceMiddleware = new TraceMiddleware({
 export async function startServer(args: string[] = process.argv.slice(2)) {
   const app = express();
   app.use(cors());
+
+  app.get("/debug-sentry", function mainHandler(req, res) {
+    throw new Error("My first Sentry error!");
+  });
+
+  /** Intentional null-dereference for debugging (e.g. Sentry). GET /test-bug */
+  app.get('/test-bug', (_req, res) => {
+    const user = null as unknown as { profile: { displayName: string } }
+    // Missing null check: `user` is null at runtime
+    res.json({ displayName: user.profile.displayName })
+  })
 
   app.get('/health', (_: any, res: any) => {
     res.json({ status: 'OK', server: SERVER_NAME, version: SERVER_VERSION });
@@ -83,7 +95,10 @@ export async function startServer(args: string[] = process.argv.slice(2)) {
   app.get('/mcp', handleSessionRequest);
   app.delete('/mcp', handleSessionRequest);
 
-  const PORT = 8080
+  // After all routes; see https://docs.sentry.io/platforms/javascript/guides/express/
+  Sentry.setupExpressErrorHandler(app);
+
+  const PORT = 9000
 
   app.listen(PORT, () => {
     console.error(`MCP Web Server running at http://localhost:${PORT}`);
