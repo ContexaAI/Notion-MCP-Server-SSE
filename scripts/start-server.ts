@@ -83,12 +83,16 @@ export async function startServer(args: string[] = process.argv.slice(2)) {
   app.get('/mcp', handleSessionRequest);
   app.delete('/mcp', handleSessionRequest);
 
-  const PORT = 8080
+  const PORT = parseInt(process.env.PORT ?? '8080', 10)
 
-  app.listen(PORT, () => {
-    console.error(`MCP Web Server running at http://localhost:${PORT}`);
-    console.error(`- Health Check: http://localhost:${PORT}/health`);
-    console.error(`- MCP Endpoint: http://localhost:${PORT}/mcp`);
+  await new Promise<void>((resolve, reject) => {
+    const server = app.listen(PORT, () => {
+      console.error(`MCP Web Server running at http://localhost:${PORT}`);
+      console.error(`- Health Check: http://localhost:${PORT}/health`);
+      console.error(`- MCP Endpoint: http://localhost:${PORT}/mcp`);
+      resolve();
+    });
+    server.on('error', reject);
   });
 
   return proxy.getServer()
