@@ -21,17 +21,6 @@ export async function startServer(args: string[] = process.argv.slice(2)) {
   const app = express();
   app.use(cors());
 
-  app.get("/debug-sentry", function mainHandler(req, res) {
-    throw new Error("My first Sentry error!");
-  });
-
-  /** Intentional null-dereference for debugging (e.g. Sentry). GET /test-bug */
-  app.get('/test-bug', (_req, res) => {
-    const user = null as unknown as { profile: { displayName: string } }
-    // Missing null check: `user` is null at runtime
-    res.json({ displayName: user.profile.displayName })
-  })
-
   app.get('/health', (_: any, res: any) => {
     res.json({ status: 'OK', server: SERVER_NAME, version: SERVER_VERSION });
   });
