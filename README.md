@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/contexaai-notion-mcp-server-sse-badge.png)](https://mseep.ai/app/contexaai-notion-mcp-server-sse)
+
 ## Deploy and get started in minutes on ContexaAI
 
 <a href="https://platform.contexaai.com">
